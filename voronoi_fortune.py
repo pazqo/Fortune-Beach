@@ -2,12 +2,15 @@
 # Fortune's Algorithm in O(n*logn)
 
 import numpy as np
-from matplotlib import collections as mc
 import matplotlib.pyplot as plt
-from collections import defaultdict
 import time
-
 import sys
+from matplotlib import collections as mc
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
+from matplotlib.cm import jet
+from collections import defaultdict
+
 
 def go_to_i(alist, apoint, comparison):
     i = 0
@@ -69,8 +72,11 @@ class Point(object):
     def __repr__(self):
         return str(self)
 
-    # def __eq__(self, other):
-    #     return self.x == other.x and self.y == other.y
+    def __eq__(self, other):
+        return isinstance(other,Point) and self.x == other.x and self.y == other.y
+
+    def __hash__(self):
+        return hash(str(self))
 
     def is_x_greater(self, p):
         return self.x > p.x
@@ -417,26 +423,43 @@ class Voronoi(object):
         ax.plot(xs, ys, 'ro')
         fig.savefig(file_name)
 
-    def get_patches(self, xrange=(-2,2), yrange = (-2,2)):
+    def get_patches(self, x_range=(-3,3), y_range = (-3,3), file_name="voronoi.png"):
         v1 = self.run()
-        ps = self.sites
-        ps_dict = defaultdict(list)
+        pts = self.sites
+        pts_dict = defaultdict(list)
+        patches = []
+        colors = []
         for edge in v1.edges:
-            ps_dict[edge.pl].append((edge.start, edge.end))
-            ps_dict[edge.pr].append((edge.start, edge.end))
-        print(ps_dict)
-
+            pts_dict[edge.pl].append((edge.start, edge.end))
+            pts_dict[edge.pr].append((edge.start, edge.end))
+        for center, v_raw in pts_dict.items():
+            starts, ends = zip(*v_raw)
+            vertices = set(starts + ends)
+            vertices = sorted(vertices, key=lambda p: np.arctan2(p.y-center.y,p.x-center.x))
+            vertices = [(v.x, v.y) for v in vertices]
+            patches.append(Polygon(vertices, True))
+            colors.append(center.dist_to_point(Point(0,0)))
+        fig, ax = plt.subplots()
+        #colors = 100*np.random.rand(len(patches))
+        pc = PatchCollection(patches, cmap=jet, alpha=0.2)
+        pc.set_array(np.array(colors))
+        ax.axis([*x_range, *y_range])
+        ax.add_collection(pc)
+        ax.margins(0.1)
+        xs, ys = zip(*[p.pair for p in pts])
+        ax.plot(xs, ys, 'ro', markersize=1)
+        fig.savefig(file_name)
 
 
 def main(argv=sys.argv):
-    xs = np.random.uniform(-2, 2, 100)
-    ys = np.random.uniform(-2, 2, 100)
+    xs = np.random.normal(0, 1, 100)
+    ys = np.random.normal(0, 1, 100)
     points = [Point(x, y) for x, y in zip(xs, ys)]
     print("started")
     time0 = time.time()
     v1 = Voronoi(points)
-    #v1.get_patches()
-    v1.plot(file_name="test.png")
+    v1.get_patches()
+    #v1.plot(file_name="test.png")
     time1 = time.time()
     print("ended")
     print("it took %.4f seconds and %s iterations" % (time1 - time0, v1.iterations))
